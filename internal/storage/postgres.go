@@ -3,6 +3,8 @@ package storage
 import (
 	"TestTaskMessagio/internal/models"
 	"database/sql"
+	"fmt"
+	"os"
 
 	_ "github.com/lib/pq"
 )
@@ -11,8 +13,17 @@ type PostgresDB struct {
 	db *sql.DB
 }
 
-func NewPostgresDB() (*PostgresDB, error) {
-	connStr := "host=db user=postgres password=password dbname=messages sslmode=disable"
+func GetPostgresConnectionString() string {
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("POSTGRES_HOST"),
+		os.Getenv("POSTGRES_PORT"),
+		os.Getenv("POSTGRES_USER"),
+		os.Getenv("POSTGRES_PASSWORD"),
+		os.Getenv("POSTGRES_DB"),
+	)
+}
+
+func NewPostgresDB(connStr string) (*PostgresDB, error) {
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, err
@@ -34,6 +45,12 @@ func NewPostgresDB() (*PostgresDB, error) {
 	return &PostgresDB{db: db}, nil
 }
 
+func (p *PostgresDB) Close() error {
+	if p.db != nil {
+		return p.db.Close()
+	}
+	return nil
+}
 func (p *PostgresDB) SaveMessage(content string) (*models.Message, error) {
 	var message models.Message
 	err := p.db.QueryRow(

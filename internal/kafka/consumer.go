@@ -5,6 +5,7 @@ import (
 	"TestTaskMessagio/internal/storage"
 	"encoding/json"
 	"log"
+	"os"
 
 	"github.com/IBM/sarama"
 )
@@ -14,9 +15,9 @@ type Consumer struct {
 	db       *storage.PostgresDB
 }
 
-func NewConsumer(db *storage.PostgresDB) (*Consumer, error) {
+func NewConsumer(db *storage.PostgresDB, kafkaBrokers []string) (*Consumer, error) {
 	config := sarama.NewConfig()
-	consumer, err := sarama.NewConsumer([]string{"kafka:9092"}, config)
+	consumer, err := sarama.NewConsumer(kafkaBrokers, config)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +25,7 @@ func NewConsumer(db *storage.PostgresDB) (*Consumer, error) {
 }
 
 func (c *Consumer) Consume() {
-	partitionConsumer, err := c.consumer.ConsumePartition("messages", 0, sarama.OffsetNewest)
+	partitionConsumer, err := c.consumer.ConsumePartition(os.Getenv("KAFKA_TOPIC"), 0, sarama.OffsetNewest)
 	if err != nil {
 		log.Printf("Failed to start consumer: %v", err)
 		return
