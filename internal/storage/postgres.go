@@ -3,8 +3,11 @@ package storage
 import (
 	"TestTaskMessagio/internal/models"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -23,14 +26,8 @@ func GetPostgresConnectionString() string {
 	)
 }
 
-func NewPostgresDB(connStr string) (*PostgresDB, error) {
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Создаем таблицу, если она не существует
-	_, err = db.Exec(`
+func migrations(db *sql.DB) (sql.Result, error) {
+	result, err := db.Exec(`
         CREATE TABLE IF NOT EXISTS messages (
             id SERIAL PRIMARY KEY,
             content TEXT NOT NULL,
@@ -38,6 +35,36 @@ func NewPostgresDB(connStr string) (*PostgresDB, error) {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     `)
+	return result, err
+}
+func NewPostgresDB(connStr string) (*PostgresDB, error) {
+	var db *sql.DB
+	var err error
+
+	maxAttempts := 5
+	for attempts := 1; attempts <= maxAttempts; attempts++ {
+		db, err = sql.Open("postgres", connStr)
+		if err != nil {
+			log.Printf("Attempt %d: Failed to connect to database: %v", attempts, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		// Проверка соединения
+		err = db.Ping()
+		if err == nil {
+			break
+		}
+
+		log.Printf("Attempt %d: Failed to ping database: %v", attempts, err)
+		time.Sleep(2 * time.Second)
+	}
+
+	if err != nil {
+		return nil, errors.New("failed to connect to database after multiple attempts")
+	}
+	// Создаем таблицу, если она не существует
+	_, err = migrations(db)
 	if err != nil {
 		return nil, err
 	}
